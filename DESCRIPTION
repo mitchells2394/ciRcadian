@@ -1,0 +1,29 @@
+Package: ciRcadian
+Title: Rapid analysis of MetaMorph circadian period results 
+Version: 0.0.0.9000
+Authors@R: person("Mitchell", "Slivinsky", 
+    email = "maslivinsky@ucdavis.edu", role = c("aut", "cre"))
+Description: Expedites analysis of circadian period results found in
+    imp_detrended_results files produced by MetaMorph per the workflow recommended
+    by Cassandra Baker (Harmer Lab, Integrative Genetics and Genomics Graduate 
+    Group, UC Davis) for analyzing luciferase reporter assays performed on A. 
+    thaliana. It implements basic data wrangling and graphing functions to 
+    organize data and create plots, facilitating rapid comparison of circadian 
+    period data between different families or organisms. Some functions may be 
+    generalizable to other organisms for which similar data are available. 
+License: CC0
+Encoding: UTF-8
+LazyData: true
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.1.0
+Imports: 
+    ggplot2,
+    dplyr,
+    readr,
+    readxl,
+    tidyr,
+    rlang
+Suggests: 
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
