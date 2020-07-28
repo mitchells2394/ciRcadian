@@ -15,7 +15,7 @@ Preferred way to install this package is through the devtools package:
 
 ```r
 devtools::install_github("mitchells2394/ciRcadian", 
-                         upgrade_dependencies = FALSE, 
+                         upgrade = FALSE, 
                          build_vignettes = TRUE)
 ```
 
