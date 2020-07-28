@@ -1,0 +1,189 @@
+---
+title: "introduction"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{introduction}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(ciRcadian)
+```
+
+### Introduction 
+Hello! My name is Mitchell Slivinsky, a former member of the Harmer Lab at UC Davis and a Microbiology student that graduated from UC Davis in June 2020. Welcome to the `ciRcadian` package vignette! This vignette includes a basic description of the purpose of this package, an example of the type of data this package is specialized to work with, and the code of each of this package's four functions, for reference. During my time in the lab, I worked under Cassandra Baker (Ph.D. Candidate, Integrative Genetics and Genomics Graduate Group), and this package is intended for her, for her future undergraduates, and for other undergraduate or graduate students of UC Davis that find themselves analyzing circadian clock data. Accordingly, **this package is licensed under a Creative Commons CC0 license ("No rights reserved") with the intent of allowing this package to be freely acquired by any researchers that could benefit from it.** 
+
+The goal of this package is to expedite and simplify some of the tedious data processing and visualization that is needed at the tail end of analysis of luciferase reporter assays performed on *Arabidopsis thaliana* using BRASS and MetaMorph. Both BRASS and MetaMorph were being used by the Harmer Lab in these reporter assays as of June 2020, and it is possible that this package may become obsolete as new software for circadian rhythm analysis becomes available or either BRASS or MetaMorph is updated. Cassandra created a very particular workflow for processing data from these two softwares in order to complete analysis of luciferase reporter assays, and this package integrates and replaces the end of this workflow from the point at which specific files, called "imp_detrended_results" files, are created. As I have neither the space nor ability to explain the protocol for developing these files here, I will leave that to Cassandra and hope that an example of these types of files, provided in this package, will suffice for those unfamiliar with her or her work. 
+
+This package contains four functions: `luc_organize()`, `luc_compare()`, `luc_scatter()`, and `luc_boxplot`. `luc_organize()` is the most important of the four: it takes "imp_detrended_results" files and organizes and combines them, resulting in a single neat, tidy file containing all major results of the luciferase reporter assay. The other three functions are specialized to use the data found in the result of `luc_organize()`, a data frame called `luc_output`. They will use this data frame as the default one unless another data frame is explicitly provided as an argument in these functions. `luc_compare()` performs a two-sample t-test for difference in mean circadian period between two different genotypes. `luc_scatter()` creates a scatterplot of period and RAE for individual regions and facets the plot by genotype. `luc_boxplot()` makes a boxplot of periods for each genotype and combines all these boxplots on the same plot. Altogether, these latter three functions enable quick, basic understanding of the results of the luciferase reporter assay. 
+
+Some final important points: before using this package, make sure to set your working directory. This is important because this package both draws files from and writes new files to the working directory. If you're new to R Studio, I would recommend setting the working directory by:
+
+1. making an empty folder on your desktop
+2. making a new R Project in the empty folder (go to File > New Project > Existing Directory > "Browse..." to find the folder you just made > Create Project)
+3. dumping your "imp_detrended_results" files into this folder
+4. making a new R Script in R Studio
+5. opening your project in the script (button to do this should be in the top right of the console)
+6. loadinge package (use `library(ciRcadian)`) and then running your analysis in the script. 
+
+This package uses the following packages: `ggplot2`, `dplyr`, `tidyr`, `rlang`, `readxl`, and `readr`. 
+
+### Example Dataset
+The typical format of "imp_detrended_results" files is a .xls file containing four sheets: a summary sheet, a waveforms sheet, a .cnd sheet, and a final sheet appended to the other three by hand, containing information on the luminescence data by ZT time for individual regions. The first two aren't important for this package and are ignored. The general format of the remaining two sheets is assumed by the functions of this package and is important for this package to run correctly. Because this formatting assumption is so important, this package contains an example "imp_detrended_result" file, called "Ideal_imp_detrended_results.xls", taken from the Dull503 luciferase assay. The general format of the .cnd sheet and the luminescence/ZT time sheet in your "imp_detrended_results" files should match that of the corresponding sheets in "Ideal_imp_detrended_results.xls". This file can be found in the ciRcadian package folder installed in the library directory for your R Studio, under the "data" subdirectory. If you're new to R Studio, you can figure out where the ciRcadian package folder is by using `.libPaths()`. 
+
+Additionally, important assumptions about "imp_detrended_results" files used in this package are detailed in the documentation for the functions; try `?luc_organize()` for the most important ones. 
+
+### Function Code
+Feel free to ignore this unless you are interested in figuring out how this package works. 
+
+#### luc_organize()
+```{r eval=FALSE}
+luc_organize <- function(names, cnd_sheet, zt_lum_sheet) {
+  for (i in 1:length(names)) {
+    df <- readxl::read_excel(names[i], sheet = zt_lum_sheet)
+    df2 <- df %>%
+      dplyr::filter(is.na(`ZT Time`) == T) %>%
+      dplyr::select(File, Genotype, Region = `Well / Region`, 6:ncol(df))
+    inter <- readxl::read_excel(names[i], sheet = cnd_sheet, range = readxl::cell_cols("J:AR"))
+    combine <- inter[1:nrow(df2), ] %>%
+      dplyr::select(File = 1, Period, Amplitude, Phase, RAE) %>%
+      dplyr::inner_join(df2, by = "File") %>%
+      dplyr::select(!File)
+    final <- combine[, c(6, 5, seq(1, 4, 1), seq(7, ncol(combine), 1))] %>%
+      tidyr::separate(Region, into = c("ROI", "Region", "Ellipse"), sep = "'") %>%
+      dplyr::select(!ROI) %>%
+      dplyr::select(!Ellipse)
+    if (i == 1) {
+      output <- final
+    } else {
+      output <- output %>%
+        dplyr::bind_rows(final)
+    }
+    if (i == length(names)) {
+      output$Genotype <- readr::parse_factor(output$Genotype)
+      output$Region <- readr::parse_integer(output$Region)
+      assign("luc_output", output, envir = rlang::global_env())
+      readr::write_csv(output, "All results.csv")
+      print("Result saved to global environment as `luc_output` and into working directory as `All results.csv`",
+            quote = F)
+    }
+  }
+}
+```
+
+#### luc_compare()
+```{r eval=FALSE}
+luc_compare <- function(df = luc_output, names) {
+  if (length(names) != 2) {
+    stop("`names` argument must be length 2")
+  }
+  if (names[1] %in% df$Genotype == F) {
+    stop("First value of `names` is not present in `Genotype` column of `df`")
+  }
+  if (names[2] %in% df$Genotype == F) {
+    stop("Second value of `names` is not present in `Genotype` column of `df`")
+  }
+  data <- df %>%
+    dplyr::filter(Genotype == ((!! names[1])) | Genotype == ((!! names[2])) )
+  test_results <- t.test(data$Period ~ data$Genotype, mu = 0, alternative = "two.sided", conf = 0.95, var.equal = F)
+  assign("test_results", test_results, envir = global_env())
+  print("Results saved to global environment as `test_results`", quote = F)
+  print(paste0("Alternative hypothesis: true difference in mean period between ",
+               names[1], " and ", names[2], " is not equal to 0"), quote = F)
+  print(paste0("p-value = ", test_results$p.value), quote = F)
+  print(test_results$estimate)
+}
+```
+
+#### luc_scatter()
+```{r eval=FALSE}
+luc_scatter <- function(df = luc_output, title = "Period (hours) vs. RAE", order = NA, labels = T) {
+  if (length(summary(df$Genotype)) > 20){
+    stop("`luc_scatter()` is designed to plot no more than 20 genotypes/families.
+         Please subset `df` so that it contains data for at most 20 genotypes/families.")
+  }
+  if (length(order) > 1) {
+    df$Genotype <- factor(df$Genotype, levels = order)
+  }
+  img_title <- paste0(title, ".png")
+  plot <- ggplot2::ggplot(df, aes(Period, RAE, color = Genotype)) +
+    ggplot2::geom_point(size = 1) +
+    ggplot2::labs(title = title,
+                  x = "period (hours)",
+                  y = "RAE",
+                  color = "Genotype") +
+    ggplot2::scale_color_brewer(palette = "Paired") +
+    ggplot2::scale_y_continuous(breaks = seq(0, 1, 0.2)) +
+    ggplot2::scale_x_continuous(breaks = seq(0, 200, 2)) +
+    ggplot2::geom_hline(yintercept = 0.6, linetype = "dashed", color = "black") +
+    ggplot2::theme_bw() +
+    ggplot2::coord_cartesian(xlim = c(floor(min(df$Period)) - 1,
+                                      ceiling(max(df$Period)) + 1),
+                             ylim = c(0, 1)) +
+    ggplot2::theme(plot.title = element_text(hjust = 0.5),
+                   axis.title = element_text(size = 13),
+                   axis.text = element_text(size = 9.5) )
+  if (labels == T) {
+    plot <- plot + ggplot2::geom_text(aes(label = Region), hjust = 0, vjust = 0, size = 1.2, color = "black")
+  }
+  if (length(summary(df$Genotype)) %in% seq(1, 5, 1)){
+    plot <- plot + ggplot2::facet_wrap(~Genotype, ncol = 1, strip.position = "right")
+    print(plot)
+    ggplot2::ggsave(img_title, height = 5, width = 5)
+  } else if (length(summary(df$Genotype)) %in% seq(6, 10, 1)) {
+    plot <- plot + ggplot2::facet_wrap(~Genotype, ncol = 2, strip.position = "right")
+    print(plot)
+    ggplot2::ggsave(img_title, height = 5, width = 10)
+  } else if (length(summary(df$Genotype)) %in% seq(11, 15, 1)) {
+    plot <- plot + ggplot2::facet_wrap(~Genotype, ncol = 3, strip.position = "right")
+    print(plot)
+    ggplot2::ggsave(img_title, height = 5, width = 15)
+  } else if (length(summary(df$Genotype)) %in% seq(16, 20, 1)) {
+    plot <- plot + ggplot2::facet_wrap(~Genotype, ncol = 4, strip.position = "right")
+    print(plot)
+    ggplot2::ggsave(img_title, height = 5, width = 20)
+  }
+  print(paste0("Plot saved to working directory as ", "`", img_title, "`"), quote= F)
+}
+```
+
+#### luc_boxplot()
+```{r eval=FALSE}
+luc_boxplot <- function(df = luc_output, title = "Period (hours) distribution of genotypes",
+                        order = NA) {
+  if (length(summary(df$Genotype)) > 20){
+    stop("`luc_boxplot()` is designed to plot no more than 20 genotypes/families.
+         Please subset `df` so that it contains data for at most 20 genotypes/families.")
+  }
+  if (length(order) > 1) {
+    df$Genotype <- factor(df$Genotype, levels = order)
+  }
+  img_title <- paste0(title, ".png")
+  plot <- ggplot2::ggplot(df, aes(Period, Genotype, fill = Genotype)) +
+    ggplot2::geom_boxplot(outlier.size = 1) +
+    ggplot2::labs(title = title,
+                  x = "period (hours)",
+                  y = "genotype",
+                  fill = "Genotype") +
+    ggplot2::scale_fill_brewer(palette = "Paired") +
+    ggplot2::scale_x_continuous(breaks = seq(0, 200, 2)) +
+    ggplot2::scale_y_discrete(limits = rev(levels(df$Genotype))) +
+    ggplot2::theme_bw() +
+    ggplot2::coord_cartesian(xlim = c(floor(min(df$Period)) - 1,
+                                      ceiling(max(df$Period)) + 1)) +
+    ggplot2::theme(plot.title = element_text(hjust = 0.5),
+                   axis.title = element_text(size = 13),
+                   axis.text = element_text(size = 9.5) )
+  print(plot)
+  ggplot2::ggsave(img_title, height = length(summary(df$Genotype))/2, width = 6)
+  print(paste0("Plot saved to working directory as ", "`", img_title, "`"), quote= F)
+}
+```
